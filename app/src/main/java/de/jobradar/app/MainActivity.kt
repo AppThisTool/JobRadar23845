@@ -1,17 +1,24 @@
 package de.jobradar.app
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.work.*
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -32,17 +39,72 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun JobRadarScreen() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var radius by remember { mutableFloatStateOf(15f) }
-    Scaffold { padding ->
-        Column(Modifier.padding(padding).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("JobRadar 23845", style = MaterialTheme.typography.headlineMedium)
-            Text("Friseur & passende Quereinsteiger-Jobs")
-            Text("Suchradius: ${radius.toInt()} km")
-            Slider(value = radius, onValueChange = { radius = it }, valueRange = 5f..50f, steps = 8)
-            Text("Gesucht wird bevorzugt nach ca. 30 Std./Woche, ohne Wochenendarbeit und ohne schwere körperliche Tätigkeit.")
-            Button(onClick = { }) { Text("Jetzt Stellen suchen") }
-            HorizontalDivider()
-            Text("Quellen: Bundesagentur für Arbeit, Arbeitnow; Jooble und Adzuna vorbereitet")
+    var loading by remember { mutableStateOf(false) }
+    var jobs by remember { mutableStateOf<List<JobOffer>>(emptyList()) }
+    var status by remember { mutableStateOf("Noch keine Suche durchgeführt.") }
+
+    Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("JobRadar 23845", style = MaterialTheme.typography.headlineMedium)
+        Text("Friseur & passende Quereinsteiger-Jobs")
+        Text("Suchradius: ${radius.toInt()} km")
+        Slider(value = radius, onValueChange = { radius = it }, valueRange = 5f..50f, steps = 8, enabled = !loading)
+        Text("Bevorzugt: ca. 30 Std./Woche, kein Wochenende und keine schwere körperliche Tätigkeit.")
+
+        Button(
+            enabled = !loading,
+            onClick = {
+                loading = true
+                status = "Stellen werden durchsucht …"
+                scope.launch {
+                    try {
+                        val result = JobSearchRepository.search("23845", radius.toInt())
+                        jobs = result.jobs
+                        status = if (jobs.isEmpty()) {
+                            "Keine passenden Treffer gefunden.\n${result.sourceMessages.joinToString(" · ")}"
+                        } else {
+                            "${jobs.size} Treffer gefunden. ${result.sourceMessages.joinToString(" · ")}"
+                        }
+                    } catch (e: Exception) {
+                        status = "Suche fehlgeschlagen: ${e.message ?: e.javaClass.simpleName}"
+                    } finally {
+                        loading = false
+                    }
+                }
+            }
+        ) {
+            if (loading) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(10.dp))
+            }
+            Text(if (loading) "Suche läuft …" else "Jetzt Stellen suchen")
+        }
+
+        Text(status, style = MaterialTheme.typography.bodyMedium)
+        HorizontalDivider()
+
+        if (jobs.isNotEmpty()) {
+            LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(jobs, key = { "${it.source}-${it.id}" }) { job ->
+                    ElevatedCard(
+                        Modifier.fillMaxWidth().clickable {
+                            if (job.url.isNotBlank()) context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(job.url)))
+                        }
+                    ) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(job.title, style = MaterialTheme.typography.titleMedium)
+                            Text(job.company)
+                            Text(job.location)
+                            Text("Quelle: ${job.source}", style = MaterialTheme.typography.labelMedium)
+                            Text("Antippen, um Stellenanzeige zu öffnen", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        } else {
+            Text("Quellen: Bundesagentur für Arbeit und Arbeitnow. Weitere Quellen können modular ergänzt werden.")
             Text("Die tägliche automatische Suche ist aktiviert.")
         }
     }
