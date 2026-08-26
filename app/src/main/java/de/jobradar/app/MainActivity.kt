@@ -53,28 +53,19 @@ fun JobRadarScreen() {
         Slider(value = radius, onValueChange = { radius = it }, valueRange = 5f..50f, steps = 8, enabled = !loading)
         Text("Bevorzugt: ca. 30 Std./Woche, kein Wochenende und keine schwere körperliche Tätigkeit.")
 
-        Button(
-            enabled = !loading,
-            onClick = {
-                loading = true
-                status = "Stellen werden durchsucht …"
-                scope.launch {
-                    try {
-                        val result = JobSearchRepository.search("23845", radius.toInt())
-                        jobs = result.jobs
-                        status = if (jobs.isEmpty()) {
-                            "Keine passenden Treffer gefunden.\n${result.sourceMessages.joinToString(" · ")}"
-                        } else {
-                            "${jobs.size} Treffer gefunden. ${result.sourceMessages.joinToString(" · ")}"
-                        }
-                    } catch (e: Exception) {
-                        status = "Suche fehlgeschlagen: ${e.message ?: e.javaClass.simpleName}"
-                    } finally {
-                        loading = false
-                    }
-                }
+        Button(enabled = !loading, onClick = {
+            loading = true
+            status = "Stellen werden durchsucht …"
+            scope.launch {
+                try {
+                    val result = JobSearchRepository.search("23845", radius.toInt())
+                    jobs = result.jobs
+                    status = if (jobs.isEmpty()) "Keine passenden Treffer gefunden." else "${jobs.size} passende Stellen gefunden."
+                } catch (e: Exception) {
+                    status = "Suche derzeit nicht möglich. Bitte später erneut versuchen."
+                } finally { loading = false }
             }
-        ) {
+        }) {
             if (loading) {
                 CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(10.dp))
@@ -88,23 +79,20 @@ fun JobRadarScreen() {
         if (jobs.isNotEmpty()) {
             LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(jobs, key = { "${it.source}-${it.id}" }) { job ->
-                    ElevatedCard(
-                        Modifier.fillMaxWidth().clickable {
-                            if (job.url.isNotBlank()) context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(job.url)))
-                        }
-                    ) {
+                    ElevatedCard(Modifier.fillMaxWidth().clickable {
+                        if (job.url.isNotBlank()) context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(job.url)))
+                    }) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(job.title, style = MaterialTheme.typography.titleMedium)
                             Text(job.company)
                             Text(job.location)
-                            Text("Quelle: ${job.source}", style = MaterialTheme.typography.labelMedium)
-                            Text("Antippen, um Stellenanzeige zu öffnen", style = MaterialTheme.typography.bodySmall)
+                            Text("Stellenanzeige öffnen", style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
             }
         } else {
-            Text("Quellen: Bundesagentur für Arbeit und Arbeitnow. Weitere Quellen können modular ergänzt werden.")
+            Text("JobRadar durchsucht die angebundenen Stellenangebote automatisch im Hintergrund.")
             Text("Die tägliche automatische Suche ist aktiviert.")
         }
     }
