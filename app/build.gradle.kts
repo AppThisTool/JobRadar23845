@@ -7,25 +7,15 @@ plugins {
 android {
     namespace = "de.jobradar.app"
     compileSdk = 35
-
     defaultConfig {
         applicationId = "de.jobradar.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 22
-        versionName = "2.2"
+        versionCode = 23
+        versionName = "2.3"
     }
-
-    buildFeatures {
-        compose = true
-        buildConfig = true
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
+    buildFeatures { compose = true; buildConfig = true }
+    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
 }
 
